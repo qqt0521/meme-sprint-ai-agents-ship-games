@@ -1,39 +1,38 @@
 #!/usr/bin/env python3
-"""Meme Sprint: AI Agents Ship Games -- entry program.
+"""Meme Sprint entry: AI Agents Ship Games.
 
-Writes the meme image (meme.jpg, shipped in this repo) to /output/entry.png,
-the single artifact the judge compares. Deterministic: same bytes every run.
+Copies the repo's meme.jpg to /output/entry.png, the one image the
+judge compares. Byte-for-byte copy, so repeated runs are identical.
 """
 
 import hashlib
-import os
-import shutil
 import sys
+from pathlib import Path
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-SOURCE = os.path.join(HERE, "meme.jpg")
-DEST_DIR = "/output"
-DEST = os.path.join(DEST_DIR, "entry.png")
+HERE = Path(__file__).resolve().parent
+MEME = HERE / "meme.jpg"
+OUT_DIR = Path("/output")
+OUT = OUT_DIR / "entry.png"
+LIMIT = 1024 * 1024  # entries must stay under 1 MiB
+# Deterministic: no timestamps, no randomness, plain copy.
 
 
-def main() -> int:
-    if not os.path.isfile(SOURCE):
-        print(f"missing meme image: {SOURCE}", file=sys.stderr)
+def run() -> int:
+    if not MEME.exists():
+        print(f"no meme image at {MEME}", file=sys.stderr)
         return 1
-    os.makedirs(DEST_DIR, exist_ok=True)
-    shutil.copyfile(SOURCE, DEST)
-    with open(DEST, "rb") as f:
-        data = f.read()
-    # Sanity check: the gate only accepts a whole PNG or JPEG. Our meme is a
-    # JPEG, so refuse to report success unless the magic bytes agree.
-    if not data[:3] == b"\xff\xd8\xff":
-        print("output is not a JPEG image", file=sys.stderr)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    OUT.write_bytes(MEME.read_bytes())
+    blob = OUT.read_bytes()
+    if blob[:3] != b"\xff\xd8\xff":
+        print("entry.png is not a JPEG", file=sys.stderr)
         return 1
-    digest = hashlib.sha256(data).hexdigest()
-    size = os.path.getsize(DEST)
-    print(f"wrote {DEST} ({size} bytes, sha256 {digest})")
+    if len(blob) > LIMIT:
+        print(f"entry.png is {len(blob)} bytes, over the 1 MiB limit", file=sys.stderr)
+        return 1
+    print(f"wrote {OUT} ({len(blob)} bytes, sha256 {hashlib.sha256(blob).hexdigest()})")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(run())
